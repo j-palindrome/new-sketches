@@ -3,201 +3,156 @@ import Call from '@reactive/components/Call'
 import CanvasGL, { Framebuffer, Mesh, Plane } from '@reactive/components/CanvasGL'
 import { ellipse, polToCar } from '@util/geometry'
 import { uvToCircle } from '@util/shaders/manipulation'
-import { PI, uvToPosition, wrapPosition, wrapUv } from '@util/shaders/utilities'
+import {
+  PI,
+  defaultFragColor,
+  defaultVert2D,
+  defaultVert2DNoResolution,
+  uvToPosition,
+  wrapPosition,
+  wrapUv
+} from '@util/shaders/utilities'
 import _ from 'lodash'
 import { useMemo } from 'react'
 import * as twgl from 'twgl.js'
+import { Algorithmic } from 'total-serialism'
+import { Curve, Group, Pt } from 'pts'
+import normals from 'polyline-normals'
+import bezier from 'adaptive-bezier-curve'
+import { SplineCurve, Vector2 } from 'three'
+import { sine } from '@util/math'
 
+// a series of wavy lines that blow to the left and out while they wave.
+// fractal circles—like a lindenmayer system
 export default function App() {
-  type Types = {
-    otherParticles0: twgl.FramebufferInfo
-    otherParticles1: twgl.FramebufferInfo
-    blur0: twgl.FramebufferInfo
-    blur1: twgl.FramebufferInfo
-    blurCopy: twgl.FramebufferInfo
-    props: { pingPong: boolean; blur: 0 | 1 | 2 }
+  type Types = {}
+
+  // get each to snake randomly like the noise particles...
+  // maybe try an instanced draw with each of those...or pass a normal to each of the curved particles...
+  // shouldn't they solve their own Béziers within that curved portion?
+
+  const generateAttributes = (t: number, index: number) => {
+    type CurveInfo = {
+      position: number[]
+      normal: number[]
+      miter: number[]
+      indices: number[]
+    }
+    // const linden: string = Algorithmic.linden('AB', 3, { AB: 'ABAB', B: 'BA' })
+    const linden = 'ABBAABBA'
+
+    let size = 0.1
+
+    const generateCurve = (points: Pt[], startIndex: number = 0) => {
+      const curve = new SplineCurve(points.map((x) => new Vector2(...x)))
+      let vertices = curve.getSpacedPoints(points.length * 50).map((x) => x.toArray())
+
+      let getNormals = normals(vertices)
+      let position = vertices.map((x) => [x, x]).flat(2)
+      let normal = getNormals.map((x) => [x[0], x[0]]).flat(2)
+      let miter = getNormals
+        .map((x) => {
+          const maxMiter = _.clamp(x[1], 1)
+          return [-maxMiter, maxMiter]
+        })
+        .flat()
+
+      const indices: number[] = []
+      // jump through every position length
+      for (let i = startIndex; i < vertices.length * 2 + startIndex - 2; i += 2) {
+        indices.push(i, i + 1, i + 2, i + 1, i + 2, i + 3)
+      }
+      return {
+        position: position.flat(),
+        normal,
+        miter,
+        indices
+      } as CurveInfo
+    }
+
+    const curves: CurveInfo[] = []
+
+    for (let instance = 0; instance < 2; instance++) {
+      const points = new Group()
+      let pointer = new Pt(0, 0)
+      points.push(pointer.clone())
+      linden.split('').forEach((x, i) => {
+        const instanceT = t * (instance + 1)
+        if (x === 'A') {
+          points.push(
+            pointer.$add(0, -size * 0.5 * Math.sin(instanceT / Math.PI / 2)),
+            pointer.$add(
+              sine(instanceT, 0.3 + i * 0.23, 0.12),
+              sine(instanceT, 0.21, (-size / 2) * 0.4)
+            ),
+            pointer.$add(sine(instanceT, 1 / 1.4, 0.2), sine(instanceT, 1 / 3.9, -size))
+          )
+          pointer.add(sine(instanceT, 1 / 1.4, 0.2), sine(instanceT, 1 / 3.9, -size))
+        } else if (x === 'B') {
+          points.push(
+            pointer.$add(
+              sine(instanceT + i, 0.9, -0.12),
+              sine(instanceT + i * 0.2, 0.7, -size / 2)
+            ),
+            pointer.$add(sine(instanceT, 0.6, 0.12), sine(instanceT, 1.2, -0.6))
+          )
+          pointer.add(sine(instanceT, 0.6, 0.12), sine(instanceT, 1.2, -0.6))
+        }
+      })
+      curves.push(generateCurve(points))
+    }
+
+    return {
+      position: {
+        data: curves.flatMap((x) => x.position),
+        numComponents: 2
+      },
+      normal: {
+        data: curves.flatMap((x) => x.normal),
+        numComponents: 2
+      },
+      miter: { data: curves.flatMap((x) => x.miter), numComponents: 1 },
+      indices: { data: curves.flatMap((x) => x.indices) }
+    }
   }
   return (
     <>
-      <Reactive className="h-screen w-screen">
-        <Call
-          name="props"
-          options={{ pingPong: false, blur: 0 }}
-          draw={(self) => {
-            self.pingPong = !self.pingPong
-            self.blur = (self.blur + 1) % 3
-          }}
-        />
-        <CanvasGL
-          height={1080}
-          width={1080}
-          resize={false}
-          name="canvas"
-          className="h-full w-full"
-          setup={(gl) => {
-            gl.enable(gl.BLEND)
-            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
-            gl.clearColor(0, 0, 0, 0)
-          }}
-        >
+      <Reactive className="h-screen w-screen" loop={true}>
+        <CanvasGL name="canvas" className="h-full w-full">
           <Mesh
-            name="mesh"
+            name="curves"
+            attributes={generateAttributes(0, 1)}
+            fragmentShader={
+              /*glsl*/ `
+              void main() {
+                fragColor = vec4(1, 1, 1, 1);
+              }`
+            }
             vertexShader={
               /*glsl*/ `
               in vec2 position;
-              in float speed;
-
-              out vec2 vPosition;
-
-              uniform float dt;
-              uniform sampler2D otherParticles;
-              uniform float strength;
-              uniform float speedTotal;
-              uniform float pointSize;
-              
-              ${PI}
-              ${uvToPosition}
-              ${wrapUv}
+              in vec2 normal;
+              in float miter;
+              uniform vec2 resolution;
 
               void main() {
-                vec4 particlesHere = texture(otherParticles, position);
-                float onePixel = 1.0 / 128.0;
-                float particlesLeft = texture(otherParticles, vec2(mod(position.x - onePixel, 1.0), position.y)).a;
-                float particlesRight = texture(otherParticles, vec2(mod(position.x + onePixel, 1.0), position.y)).a;
-
-                vPosition = position + vec2(0.0, 0.0001 + speed * speedTotal * -1.0 * pow((strength + particlesHere.a * (1.0 - strength)), 1.0)) * dt / 1000.0;
-                vPosition = wrapUv(vPosition);
-
-                gl_Position = uvToPosition(vPosition);
-                gl_PointSize = pointSize;
+                float thickness = 10.0 / resolution.x;
+                //push the point along its normal by half thickness
+                vec2 p = position.xy + vec2(normal * thickness / 2.0 * miter);
+                // vec2 p = position + vec2(0.0, miter * thickness / 2.0);
+                // vec2 p = position;
+                gl_Position = vec4(p, 0, 1);
+                gl_PointSize = 1.0;
               }`
             }
-            fragmentShader={
-              /*glsl*/ `
-              uniform float opacity;
-              void main() {
-                fragColor = vec4(1, 1, 1, opacity);
-              }`
-            }
-            attributes={() => {
-              const PARTICLE_AMOUNT = (window.innerWidth * window.innerHeight) / 2 ** 2
-              const GROUPS = 500
-              const groupSize = PARTICLE_AMOUNT / GROUPS
-              const groupRadius = 0.1
-              const minSpeed = 0.7
-              const groups = _.range(GROUPS).flatMap((i) => {
-                const randomCenter = [Math.random(), Math.random()]
-                return {
-                  position: _.range(groupSize).flatMap(() => {
-                    const randomAngle = ellipse(
-                      Math.random() * groupRadius * 1.5,
-                      Math.random() * groupRadius,
-                      Math.random()
-                    )
-                    return [randomCenter[0] + randomAngle[0], randomCenter[1] + randomAngle[1]]
-                  }),
-                  speed: Math.random() * (1 - minSpeed) + minSpeed
-                }
-              })
-              return {
-                position: { data: groups.flatMap((x) => x.position), numComponents: 2 },
-                vPosition: {
-                  data: groups.flatMap((x) => x.position),
-                  numComponents: 2
-                },
-                speed: {
-                  data: groups.flatMap((x) => _.range(x.position.length).map(() => x.speed)),
-                  numComponents: 1
-                }
-              }
-            }}
-            transformFeedback={[['vPosition', 'position']]}
-            drawMode="points"
-            draw={(self, gl, { time: { dt }, elements }) => {
-              const { otherParticles0, otherParticles1, blur0, blur1, blurCopy, props } =
-                elements as Types
-              const uniforms = {
-                dt,
-                otherParticles: props.pingPong
-                  ? otherParticles1.attachments[0]
-                  : otherParticles0.attachments[0],
-                strength: 0.7,
-                speedTotal: 0.5,
-                opacity: 0.5,
-                pointSize: 1.0
-              }
-              // 1. render to 512 x 512 particle system framebuffer
-              twgl.bindFramebufferInfo(gl, props.pingPong ? otherParticles0 : otherParticles1)
-              gl.clear(gl.COLOR_BUFFER_BIT)
-              self.draw(uniforms)
-
-              // 2. render to canvas based on positions...
-              twgl.bindFramebufferInfo(gl, blur0)
-              gl.clear(gl.COLOR_BUFFER_BIT)
-              self.draw({ ...uniforms, opacity: 1, pointSize: 1.0 })
+            drawMode="triangles"
+            draw={(self, gl, { time: { t } }) => {
+              self.draw(
+                { resolution: [gl.drawingBufferWidth, gl.drawingBufferHeight] },
+                generateAttributes(t / 1000, 1)
+              )
             }}
           />
-          <Plane
-            name="blur"
-            fragmentShader={
-              /*glsl*/ `
-              uniform sampler2D tex;
-              uniform sampler2D feedbackTex;
-              
-              void main() {
-                fragColor = texture(tex, uv) + texture(feedbackTex, uv) * 0.2;
-              }`
-            }
-            draw={(self, gl, { elements }) => {
-              const { props, blur0, blur1, blurCopy } = elements as Types
-
-              // copy the previously drawn one, then overwrite it
-              twgl.bindFramebufferInfo(gl, blur1)
-              self.draw({
-                tex: blur0.attachments[0],
-                feedbackTex: blurCopy.attachments[0],
-                blur: [0, 0.5, 0, 0, 1, 0, 0, 0, 0]
-              })
-            }}
-          />
-          <Plane
-            name="render"
-            fragmentShader={
-              /*glsl*/ `
-              uniform sampler2D tex;
-              
-              void main() {
-                fragColor = texture(tex, uv);
-              }`
-            }
-            draw={(self, gl, { elements }) => {
-              const { props, blur0, blur1, blurCopy } = elements as Types
-
-              twgl.bindFramebufferInfo(gl, null)
-              gl.clear(gl.COLOR_BUFFER_BIT)
-              self.draw({
-                tex: blur1.attachments[0]
-              })
-              gl.bindTexture(gl.TEXTURE_2D, blurCopy.attachments[0])
-              gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 0, 0, 1080, 1080, 0)
-            }}
-          />
-          <Framebuffer name="otherParticles0" width={56} height={1024} />
-          <Framebuffer name="otherParticles1" width={56} height={1024} />
-          <Framebuffer name="blur0" width={1080} height={1080} />
-          <Framebuffer name="blur1" width={1080} height={1080} />
-          <Framebuffer name="blurCopy" width={1080} height={1080} />
-          {/* <Plane
-            name="render"
-            fragmentShader={`
-              uniform sampler2D tex;
-              void main() {
-                fragColor = texture(tex, uv);
-              }`}
-            draw={(self, gl, { elements: { otherParticles0, otherParticles1 } }) => {
-              self.draw({ tex: otherParticles1.attachments[0] })
-            }}
-          /> */}
         </CanvasGL>
       </Reactive>
     </>

@@ -3,6 +3,8 @@
   "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
   "include": ["electron.vite.config.*", "**/*.ts", "**/*.tsx"],
   "compilerOptions": {
+    "allowJs": true,
+    "declaration": true,
     "composite": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
