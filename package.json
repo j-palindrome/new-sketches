@@ -26,6 +26,7 @@
     "@types/three": "^0.164.1",
     "adaptive-bezier-curve": "^1.0.3",
     "autoprefixer": "^10.4.19",
+    "framer-motion": "^11.2.6",
     "immer": "^10.0.4",
     "lindenmayer": "^1.5.4",
     "lodash": "^4.17.21",

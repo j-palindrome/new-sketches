@@ -1,160 +1,32 @@
 import { Reactive } from '@reactive/blocks/ParentChildComponents'
-import Call from '@reactive/components/Call'
-import CanvasGL, { Framebuffer, Mesh, Plane } from '@reactive/components/CanvasGL'
-import { ellipse, polToCar } from '@util/geometry'
-import { uvToCircle } from '@util/shaders/manipulation'
-import {
-  PI,
-  defaultFragColor,
-  defaultVert2D,
-  defaultVert2DNoResolution,
-  uvToPosition,
-  wrapPosition,
-  wrapUv
-} from '@util/shaders/utilities'
-import _ from 'lodash'
-import { useMemo } from 'react'
+import Svg from '@reactive/components/Svg'
 import * as twgl from 'twgl.js'
-import { Algorithmic } from 'total-serialism'
-import { Curve, Group, Pt } from 'pts'
-import normals from 'polyline-normals'
-import bezier from 'adaptive-bezier-curve'
-import { SplineCurve, Vector2 } from 'three'
-import { sine } from '@util/math'
+import { motion } from 'framer-motion'
 
-// a series of wavy lines that blow to the left and out while they wave.
-// fractal circles—like a lindenmayer system
 export default function App() {
-  type Types = {}
-
-  // get each to snake randomly like the noise particles...
-  // maybe try an instanced draw with each of those...or pass a normal to each of the curved particles...
-  // shouldn't they solve their own Béziers within that curved portion?
-
-  const generateAttributes = (t: number, index: number) => {
-    type CurveInfo = {
-      position: number[]
-      normal: number[]
-      miter: number[]
-      indices: number[]
-    }
-    // const linden: string = Algorithmic.linden('AB', 3, { AB: 'ABAB', B: 'BA' })
-    const linden = 'ABBAABBA'
-
-    let size = 0.1
-
-    const generateCurve = (points: Pt[], startIndex: number = 0) => {
-      const curve = new SplineCurve(points.map((x) => new Vector2(...x)))
-      let vertices = curve.getSpacedPoints(points.length * 50).map((x) => x.toArray())
-
-      let getNormals = normals(vertices)
-      let position = vertices.map((x) => [x, x]).flat(2)
-      let normal = getNormals.map((x) => [x[0], x[0]]).flat(2)
-      let miter = getNormals
-        .map((x) => {
-          const maxMiter = _.clamp(x[1], 1)
-          return [-maxMiter, maxMiter]
-        })
-        .flat()
-
-      const indices: number[] = []
-      // jump through every position length
-      for (let i = startIndex; i < vertices.length * 2 + startIndex - 2; i += 2) {
-        indices.push(i, i + 1, i + 2, i + 1, i + 2, i + 3)
-      }
-      return {
-        position: position.flat(),
-        normal,
-        miter,
-        indices
-      } as CurveInfo
-    }
-
-    const curves: CurveInfo[] = []
-
-    for (let instance = 0; instance < 2; instance++) {
-      const points = new Group()
-      let pointer = new Pt(0, 0)
-      points.push(pointer.clone())
-      linden.split('').forEach((x, i) => {
-        const instanceT = t * (instance + 1)
-        if (x === 'A') {
-          points.push(
-            pointer.$add(0, -size * 0.5 * Math.sin(instanceT / Math.PI / 2)),
-            pointer.$add(
-              sine(instanceT, 0.3 + i * 0.23, 0.12),
-              sine(instanceT, 0.21, (-size / 2) * 0.4)
-            ),
-            pointer.$add(sine(instanceT, 1 / 1.4, 0.2), sine(instanceT, 1 / 3.9, -size))
-          )
-          pointer.add(sine(instanceT, 1 / 1.4, 0.2), sine(instanceT, 1 / 3.9, -size))
-        } else if (x === 'B') {
-          points.push(
-            pointer.$add(
-              sine(instanceT + i, 0.9, -0.12),
-              sine(instanceT + i * 0.2, 0.7, -size / 2)
-            ),
-            pointer.$add(sine(instanceT, 0.6, 0.12), sine(instanceT, 1.2, -0.6))
-          )
-          pointer.add(sine(instanceT, 0.6, 0.12), sine(instanceT, 1.2, -0.6))
-        }
-      })
-      curves.push(generateCurve(points))
-    }
-
-    return {
-      position: {
-        data: curves.flatMap((x) => x.position),
-        numComponents: 2
-      },
-      normal: {
-        data: curves.flatMap((x) => x.normal),
-        numComponents: 2
-      },
-      miter: { data: curves.flatMap((x) => x.miter), numComponents: 1 },
-      indices: { data: curves.flatMap((x) => x.indices) }
-    }
+  type Types = {
+    otherParticles0: twgl.FramebufferInfo
+    otherParticles1: twgl.FramebufferInfo
+    blur0: twgl.FramebufferInfo
+    blur1: twgl.FramebufferInfo
+    blurCopy: twgl.FramebufferInfo
+    props: { pingPong: boolean; blur: 0 | 1 | 2 }
   }
   return (
-    <>
-      <Reactive className="h-screen w-screen" loop={true}>
-        <CanvasGL name="canvas" className="h-full w-full">
-          <Mesh
-            name="curves"
-            attributes={generateAttributes(0, 1)}
-            fragmentShader={
-              /*glsl*/ `
-              void main() {
-                fragColor = vec4(1, 1, 1, 1);
-              }`
-            }
-            vertexShader={
-              /*glsl*/ `
-              in vec2 position;
-              in vec2 normal;
-              in float miter;
-              uniform vec2 resolution;
-
-              void main() {
-                float thickness = 10.0 / resolution.x;
-                //push the point along its normal by half thickness
-                vec2 p = position.xy + vec2(normal * thickness / 2.0 * miter);
-                // vec2 p = position + vec2(0.0, miter * thickness / 2.0);
-                // vec2 p = position;
-                gl_Position = vec4(p, 0, 1);
-                gl_PointSize = 1.0;
-              }`
-            }
-            drawMode="triangles"
-            draw={(self, gl, { time: { t } }) => {
-              self.draw(
-                { resolution: [gl.drawingBufferWidth, gl.drawingBufferHeight] },
-                generateAttributes(t / 1000, 1)
-              )
-            }}
-          />
-        </CanvasGL>
-      </Reactive>
-    </>
+    <motion.svg name="main" className="h-full w-full" height={37} width={104} viewBox="0 0 37 104">
+      <motion.path
+        stroke="white"
+        strokeWidth={0.2}
+        animate={{
+          d: [
+            'M59.378 1.39955C61.4869 1.85166 75.0125 4.12487 70.6789 12.457C66.5307 20.4326 62.5471 34.877 73.8669 28.3409C77.498 26.2443 64.3159 48.953 68.6335 47.5141C80.6955 43.4941 76.2283 74.773 83.4569 59.4636C87.2697 51.3885 64.8906 60.7061 78.1794 77.5796C90.1414 92.7685 65.7439 72.9145 91.8781 88.1558C103.437 94.8971 80.9848 101.814 79.7401 102.851',
+            'M58 2C60.2739 2.82114 64.2488 6.23707 61.9567 13.3317C59.0915 22.2 58.6822 30.822 63.321 31.8073C67.9599 32.7927 64.6854 40.922 64.0032 46.0951C63.321 51.2683 58.9551 65.5561 66.5955 66.5415C72.7078 67.3298 71.204 77.3805 66.5955 81.322C61.4109 85.7561 53.4976 95.1663 63.321 97.3341C75.6003 100.044 69.8699 102.261 68.2327 103',
+            'M56.9552 2C53.2819 2.7561 44.9552 8 50.5637 12.4341C66.4575 25 60.9552 37.5 54.4552 33.5C48.0267 29.544 46.1557 37.839 47.2577 42.6024C48.3597 47.3659 29.4552 32.5 40.4254 51.5C45.3759 60.0739 39.8132 62.8707 47.2577 66.5C55.6328 70.5829 55.4552 86.5 40.4254 84.5C20.6081 81.8629 37.7807 94.3195 40.4254 95',
+            'M53.7152 2C46.9623 2.7561 43.1432 6.8588 44.5 18C46.3877 33.5 38.4494 30 26.5 26C14.682 22.044 24.4742 34.7366 26.5 39.5C28.5259 44.2634 -16.5 38 8.99999 48C20.6403 52.5648 13 69.5 21 56C29.1205 42.2967 48.6359 68.0808 21 70C-15 72.5 26.5 91 39 74.5'
+          ]
+        }}
+        transition={{ repeat: Infinity, ease: 'linear', duration: 5 }}
+      />
+    </motion.svg>
   )
 }
