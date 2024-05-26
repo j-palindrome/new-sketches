@@ -16,7 +16,7 @@ export default function App() {
     },
     { pathPoints: number[]; positions: Float32Array }
   >
-  const width = 500
+  const width = 100
   const amount = 1000
   const opacity = 0.06
   const pointSize = 1.0
@@ -133,8 +133,7 @@ export default function App() {
                 float progress = 1.0 - mod(t + offset, 1.0);
                 vec2 bezierPoints[4] = vec2[4](${range(4).map((i) => /*glsl*/ `texture(curves, vec2(pow(progress, 1.0 + ${i}.0 * 3.0) + delays.${'xyzw'[i]}, ${(i / 4).toFixed(1)} + 1.0 / 4.0 / 2.0)).xy * (offset * 0.2 + 1.0)`)});
                 vColor = pow(progress, 5.0);
-                gl_Position = vec4(bezierN(row, bezierPoints), 0, 1); 
-                gl_PointSize = ${pointSize.toFixed(2)};
+                gl_Position = vec4(bezierN(row, bezierPoints), 0, 1);
               }`
             }
             fragmentShader={
@@ -145,7 +144,7 @@ export default function App() {
               fragColor = vec4(1.0, 1.0, 1.0, 0.2 + vColor * 0.8);
             }`
             }
-            drawMode="points"
+            drawMode="line strip"
             draw={(self, gl, { time: { t }, elements: { curves } }: Context) => {
               self.draw({
                 t: t / 20,
