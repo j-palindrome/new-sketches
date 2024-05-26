@@ -38,6 +38,9 @@ importers:
       lodash:
         specifier: ^4.17.21
         version: 4.17.21
+      p5bezier:
+        specifier: ^0.6.0
+        version: 0.6.0
       polyline-normals:
         specifier: ^2.0.2
         version: 2.0.2
@@ -4614,6 +4617,10 @@ packages:
 
   /p5@1.9.3:
     resolution: {integrity: sha512-RnLMqejKJ9ZmBlUpCnVLYF1UnV/NnC13MfOSZdvJXTRH1eQkBQkUVCw5rkyRWE6chI4t5KvIJsZZnFzmGJEgag==}
+    dev: false
+
+  /p5bezier@0.6.0:
+    resolution: {integrity: sha512-a+zVql1qme+1VSPlHr26RI7xoZWcsEw1Es2S/szKIW4dLbQsozzlIEbIdFstxQme2LlGjhKBW06oWX3rNUyfLg==}
     dev: false
 
   /parent-module@1.0.1:

@@ -20,6 +20,9 @@ export default defineConfig({
   },
   renderer: {
     plugins: [react(), tsconfigPaths()],
+    define: {
+      global: {}
+    },
     build: {
       rollupOptions: {
         input: {

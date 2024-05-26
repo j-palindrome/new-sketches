@@ -30,6 +30,7 @@
     "immer": "^10.0.4",
     "lindenmayer": "^1.5.4",
     "lodash": "^4.17.21",
+    "p5bezier": "^0.6.0",
     "polyline-normals": "^2.0.2",
     "pts": "^0.12.9",
     "svg-points": "^6.0.1",

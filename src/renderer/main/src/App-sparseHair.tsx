@@ -17,8 +17,9 @@ export default function App() {
     { pathPoints: number[]; positions: Float32Array }
   >
   const width = 500
-  const amount = 2000
+  const amount = 1000
   const opacity = 0.06
+  const pointSize = 1.0
   return (
     <>
       <Reactive>
@@ -90,63 +91,6 @@ export default function App() {
               })
             }}
           />
-          {/* <Plane
-            name="renderCurves"
-            fragmentShader={
-              glsl `
-              // The texture.
-              uniform sampler2D source;
-
-              void main() {
-                fragColor = vec4(texture(source, uv).rg, 0, 1);
-              }`
-            }
-            draw={(self, gl, { elements }: Context) => {
-              self.draw({ source: elements.curves })
-            }}
-          /> */}
-          {/* <Mesh
-            name="hair"
-            fragmentShader={defaultFragColor()}
-            vertexShader={
-              glsl `
-              in vec2 uv;
-              uniform sampler2D curves;
-              out vec2 vPosition;
-              ${flipY}
-              void main() {
-                gl_PointSize = 1.0;
-                vPosition = texture(curves, uv + vec2(1.0 / ${width}.0 / 2.0, 1.0 / 4.0 / 2.0)).xy;
-                gl_Position = vec4(vPosition, 0, 1);
-              }`
-            }
-            attributes={{
-              uv: {
-                data: range(4 * width).flatMap((x) => [
-                  (x / width) % 1.0,
-                  Math.floor(x / width) / 4
-                ]),
-                numComponents: 2
-              },
-              vPosition: {
-                data: range(4 * width).flatMap(() => [0, 0]),
-                numComponents: 2
-              }
-            }}
-            drawMode="points"
-            transformFeedback={[['vPosition', 'vPosition']]}
-            setup={(self, parent, { props }) => {
-              props.positions = new Float32Array(400)
-            }}
-            draw={(self, gl, { elements: { curves }, props: { positions } }: Context) => {
-              self.draw({
-                curves
-              })
-              gl.bindBuffer(gl.TRANSFORM_FEEDBACK_BUFFER, self.bufferInfo.attribs!.vPosition.buffer)
-              gl.getBufferSubData(gl.TRANSFORM_FEEDBACK_BUFFER, 0, positions)
-              // console.log(positions)
-            }}
-          /> */}
           <Mesh
             name="blowing"
             attributes={{
@@ -156,9 +100,20 @@ export default function App() {
               },
               offset: {
                 data: range(amount).flatMap((offset) => {
-                  return range(width).map(() => (offset / amount) * Math.PI * 2)
+                  offset = Math.random() * amount
+                  return range(width).map(() => offset / amount)
+                  //offset / amount *
                 }),
                 numComponents: 1
+              },
+              delays: {
+                data: range(amount).flatMap(() => {
+                  const randIncrease = Math.random()
+                  return range(width).flatMap(() => {
+                    return range(4).map((i) => (i / 4) * randIncrease)
+                  })
+                }),
+                numComponents: 4
               }
             }}
             vertexShader={
@@ -167,16 +122,19 @@ export default function App() {
               uniform float t;
               in float row;
               in float offset;
+              in vec4 delays;
               out float vColor;
               ${PI}
+
               ${bezierN(3)}
 
               void main() {
-                vec2 pos = vec2(mod(t, 1.0), row);
-                vec2 bezierPoints[4] = vec2[4](${range(4).map((i) => /*glsl*/ `texture(curves, vec2(sin(pow(t, 1.2) + offset) * 0.5 + 0.5, ${(i / 4).toFixed(2)} + 1.0 / 4.0 / 2.0)).xy`)});
-                vColor = offset / PI / 2.0;
+                vec2 pos = vec2(mod(t + offset, 1.0), row);
+                float progress = 1.0 - mod(t + offset, 1.0);
+                vec2 bezierPoints[4] = vec2[4](${range(4).map((i) => /*glsl*/ `texture(curves, vec2(pow(progress, 1.0 + ${i}.0 * 3.0) + delays.${'xyzw'[i]}, ${(i / 4).toFixed(1)} + 1.0 / 4.0 / 2.0)).xy * (offset * 0.2 + 1.0)`)});
+                vColor = pow(progress, 5.0);
                 gl_Position = vec4(bezierN(row, bezierPoints), 0, 1); 
-                gl_PointSize = 5.0;
+                gl_PointSize = ${pointSize.toFixed(2)};
               }`
             }
             fragmentShader={
@@ -184,13 +142,13 @@ export default function App() {
             in float vColor;
             ${PI}
             void main() {
-              fragColor = vec4(1.0, 1.0, 1.0, vColor * ${opacity});
+              fragColor = vec4(1.0, 1.0, 1.0, 0.2 + vColor * 0.8);
             }`
             }
             drawMode="points"
             draw={(self, gl, { time: { t }, elements: { curves } }: Context) => {
               self.draw({
-                t: t / 2,
+                t: t / 20,
                 curves
               })
             }}
