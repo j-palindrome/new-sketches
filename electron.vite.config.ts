@@ -2,6 +2,7 @@ import { resolve } from 'path'
 import { defineConfig, externalizeDepsPlugin } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import tsconfigPaths from 'vite-tsconfig-paths'
+import { glslify } from 'vite-plugin-glslify'
 
 export default defineConfig({
   main: {
@@ -19,7 +20,7 @@ export default defineConfig({
     }
   },
   renderer: {
-    plugins: [react(), tsconfigPaths()],
+    plugins: [react(), tsconfigPaths(), glslify()],
     define: {
       global: {}
     },

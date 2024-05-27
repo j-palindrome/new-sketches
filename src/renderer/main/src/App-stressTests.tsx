@@ -149,7 +149,6 @@ export default function App() {
           width={1080}
           resize={false}
         >
-          <FeedbackTexture />
           {/* <LineCurve
             name="curves"
             subdivisions={100}
