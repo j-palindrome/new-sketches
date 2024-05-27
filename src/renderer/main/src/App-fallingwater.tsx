@@ -187,17 +187,6 @@ export default function App() {
           <Framebuffer name="blur0" width={1080} height={1080} />
           <Framebuffer name="blur1" width={1080} height={1080} />
           <Framebuffer name="blurCopy" width={1080} height={1080} />
-          {/* <Plane
-            name="render"
-            fragmentShader={`
-              uniform sampler2D tex;
-              void main() {
-                fragColor = texture(tex, uv);
-              }`}
-            draw={(self, gl, { elements: { otherParticles0, otherParticles1 } }) => {
-              self.draw({ tex: otherParticles1.attachments[0] })
-            }}
-          /> */}
         </CanvasGL>
       </Reactive>
     </>

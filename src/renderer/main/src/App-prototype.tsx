@@ -17,7 +17,7 @@ export default function App() {
       prototype: p5
       source: WebGLTexture
       feedback: twgl.FramebufferInfo
-      effectFrame: twgl.FramebufferInfo
+      effectRender: twgl.FramebufferInfo
     },
     {
       curves: number[][]
@@ -25,6 +25,83 @@ export default function App() {
   >
   return (
     <Reactive className="h-screen w-screen">
+      <CanvasGL
+        name="canvas"
+        height={1600}
+        width={1600}
+        noResize
+        glOptions={{ preserveDrawingBuffer: true }}
+      >
+        <Texture
+          name="source"
+          height={1600}
+          width={1600}
+          draw={(self, gl, { elements: { prototype } }: Context) => {
+            twgl.setTextureFromElement(gl, self, prototype.drawingContext.canvas, {
+              height: 1600,
+              width: 1600
+            })
+          }}
+        />
+
+        <Plane
+          name="drawEffect"
+          fragmentShader={
+            /*glsl*/ `
+            uniform sampler2D feedback;
+            void main() {
+              if (texture(feedback, uv).r < 0.2) {
+                fragColor = vec4(0, 0, 0, 1);
+              } else {
+                fragColor = vec4(0, 0, 0, 0.01);
+              }
+              // fragColor = texture(feedback, uv) * 1.2;
+            }`
+          }
+          draw={(self, gl, { elements }) =>
+            self.draw({
+              feedback: elements.feedback
+            })
+          }
+        />
+
+        <Plane
+          name="effect"
+          fragmentShader={
+            /* glsl */ `
+              uniform sampler2D source;
+              uniform sampler2D feedback;
+              uniform float t;
+              ${fixGlslify(snoise)}
+
+              void main() {
+                if (mod((uv.x + mod(t, 1.0)) * resolution.x, 5.0) < 2.5) {
+                  vec4 texSample = texture(source, uv);
+                  if (texSample.a > 0.0) {
+                    fragColor = vec4(1.0, 1.0, 1.0, snoise(vec3(uv * 100.0, t)));
+                    return;
+                  }
+                }
+                discard;
+              }`
+          }
+          draw={(self, gl, { t, elements }: Context) => {
+            self.draw({
+              source: elements.source,
+              t
+            })
+          }}
+        />
+        <Texture
+          name="feedback"
+          height={1600}
+          width={1600}
+          draw={(self, gl) => {
+            gl.bindTexture(gl.TEXTURE_2D, self)
+            gl.copyTexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 0, 0, 1600, 1600, 0)
+          }}
+        />
+      </CanvasGL>
       <Processing
         type="p2d"
         name="prototype"
@@ -40,7 +117,8 @@ export default function App() {
         }}
         draw={(p, { t, props: { curves } }: Context) => {
           p.clear()
-          const speed = 0.1
+
+          const speed = 0.03
           let i = 0
           for (let noisePoints of curves) {
             i++
@@ -64,69 +142,6 @@ export default function App() {
           }
         }}
       />
-      <CanvasGL name="canvas" height={1600} width={1600} noResize>
-        <Texture
-          name="source"
-          draw={(self, gl, { elements: { prototype } }: Context) => {
-            twgl.setTextureFromElement(gl, self, prototype.drawingContext.canvas, {
-              height: 1600,
-              width: 1600
-            })
-          }}
-        />
-        <Framebuffer name="effectFrame">
-          <Plane
-            name="effect"
-            fragmentShader={
-              /* glsl */ `
-              uniform sampler2D source;
-              uniform sampler2D feedback;
-              uniform float t;
-              ${fixGlslify(snoise)}
-
-              void main() {
-                fragColor = vec4(0, 0, 0, 0);
-                if (mod((uv.x + mod(t, 1.0)) * resolution.x, 5.0) < 2.5) {
-                  vec4 texSample = texture(source, uv);
-                  if (texSample.a > 0.0) {
-                    fragColor = vec4(1.0, 1.0, 1.0, snoise(vec3(uv * 100.0, t)));
-                  }
-                }
-                fragColor = mix(fragColor, texture(feedback, uv), 0.1);
-              }`
-            }
-            draw={(self, gl, { t, elements: { source, feedback, effectFrame } }: Context) => {
-              twgl.bindFramebufferInfo(gl, effectFrame)
-              self.draw({
-                source,
-                feedback: feedback.attachments[0],
-                t
-              })
-            }}
-          />
-        </Framebuffer>
-
-        {/* // https://medium.com/@josecastrovaron/analyzing-optic-and-filmic-effects-in-webgl-47abe74df74e */}
-        <Framebuffer name="feedback">
-          <Plane
-            name="render"
-            fragmentShader={
-              /*glsl*/ `
-              uniform sampler2D source;
-              
-              void main() {
-                fragColor = texture(source, uv);
-              }`
-            }
-            draw={(self, gl, { elements }: Context) => {
-              twgl.bindFramebufferInfo(gl, elements.feedback)
-              self.draw({ source: elements.effectFrame.attachments[0] })
-              twgl.bindFramebufferInfo(gl, null)
-              self.draw({ source: elements.effectFrame.attachments[0] })
-            }}
-          />
-        </Framebuffer>
-      </CanvasGL>
     </Reactive>
   )
 }
