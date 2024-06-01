@@ -38,7 +38,7 @@ export default function App() {
                   fragColor = vec4(snoise(uv + t), snoise(vec2(uv.x * 0.14345, uv.y * 0.1949) + t), snoise(vec2(uv.x * 0.14353, uv.y * 0.185439) + t), snoise(vec2(uv.x * 0.1545, uv.y * 0.29539) + t));
                 }`
               }
-              draw={(self, gl, { t }) => {
+              draw={(self, gl, { time: t }) => {
                 self.draw({ t })
                 twgl.bindFramebufferInfo(gl, null)
               }}
@@ -46,7 +46,7 @@ export default function App() {
           </Framebuffer>
           <Mesh
             name="indexes"
-            draw={(self, gl, { t, elements }) => {
+            draw={(self, gl, { time: t, elements }) => {
               // 10000 curves: 0.22 ms!
               // twgl.bindFramebufferInfo(gl, null)
               self.draw({ time: t / 2, width, height, random: elements.try.attachments[0] })

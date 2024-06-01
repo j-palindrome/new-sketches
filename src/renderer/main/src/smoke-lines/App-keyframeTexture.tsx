@@ -213,7 +213,7 @@ export default function App() {
               }`
             }
             drawMode="line strip"
-            draw={(self, gl, { t }) => {
+            draw={(self, gl, { time: t }) => {
               // 10000 curves: 0.22 ms!
               twgl.bindFramebufferInfo(gl, null)
               self.draw({ time: t / 2, width, height })

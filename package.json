@@ -33,6 +33,7 @@
     "glslify": "^7.1.1",
     "glslify-client": "^2.0.0",
     "glslify-promise": "^1.0.2",
+    "hydra-ts": "^1.0.0",
     "immer": "^10.0.4",
     "lindenmayer": "^1.5.4",
     "lodash": "^4.17.21",

@@ -22,7 +22,7 @@ import normals from 'polyline-normals'
 import bezier from 'adaptive-bezier-curve'
 import { SplineCurve, Vector2 } from 'three'
 import { sine } from '@util/math'
-import { rad, scale } from '../../../../util/src/math'
+import { rad, scale } from '../../../../../util/src/math'
 
 // a series of wavy lines that blow to the left and out while they wave.
 // fractal circles—like a lindenmayer system

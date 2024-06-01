@@ -47,6 +47,9 @@ importers:
       glslify-promise:
         specifier: ^1.0.2
         version: 1.0.2
+      hydra-ts:
+        specifier: ^1.0.0
+        version: 1.0.0
       immer:
         specifier: ^10.0.4
         version: 10.1.1
@@ -4157,6 +4160,12 @@ packages:
     transitivePeerDependencies:
       - rollup
       - supports-color
+    dev: false
+
+  /hydra-ts@1.0.0:
+    resolution: {integrity: sha512-qJXbIogzOXL8GIJauggAuuwPSqKdWsjlpHQ+oJt+dUo2bbRuvwFRQHAXld0BKU6a+9dZ2Kw2EWLyUi8pPKt13Q==}
+    dependencies:
+      regl: 1.7.0
     dev: false
 
   /iconv-corefoundation@1.1.7:

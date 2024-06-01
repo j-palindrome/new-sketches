@@ -6,7 +6,7 @@ import { range } from 'lodash'
 import { Pt } from 'pts'
 import * as twgl from 'twgl.js'
 import type p5 from 'p5'
-import { scale } from '../../../../util/src/math'
+import { scale } from '../../../../../util/src/math'
 import { fixGlslify } from '@util/shaders/utilities'
 import snoise from 'glsl-noise/simplex/3d.glsl?raw'
 
@@ -85,7 +85,7 @@ export default function App() {
                 discard;
               }`
           }
-          draw={(self, gl, { t, elements }: Context) => {
+          draw={(self, gl, { time: t, elements }: Context) => {
             self.draw({
               source: elements.source,
               t
@@ -115,7 +115,7 @@ export default function App() {
           const curves = range(30).map(() => range(10).map(() => Math.random() * 2 - 1))
           props.curves = curves
         }}
-        draw={(p, { t, props: { curves } }: Context) => {
+        draw={(p, { time: t, props: { curves } }: Context) => {
           p.clear()
 
           const speed = 0.03
